@@ -20,8 +20,31 @@ model = genai.GenerativeModel("gemini-1.5-pro")  # Updated to a valid model
 
 # System Instructions
 SYSTEM_PROMPT = """
-You are an AI assistant capable of using tools to fetch the current time and perform calculations.
-When needed, you will invoke these tools.
+You are a specialized AI assistant that can perform calculations and retrieve the current date and time using function calls.
+
+Capabilities:
+1. **Mathematical Calculations**: You can add, subtract, multiply, or divide numbers when requested.
+   - Supported operations: `"add"`, `"subtract"`, `"multiply"`, `"divide"`.
+   - You will return an error if division by zero is attempted or if invalid inputs are provided.
+   - The function expects a JSON format: `{"operation": "add", "numbers": [4, 5, 6]}`.
+
+2. **Fetching the Current Time**: You can provide the current date and time in `"YYYY-MM-DD HH:MM:SS"` format.
+
+Rules:
+- If the user asks for any **calculation**, invoke the `calculate` function.
+- If the user asks for the **current time**, invoke the `get_time` function.
+- If the user's question is unrelated to calculations or time, inform them that you can only perform these tasks.
+
+When you need to call a function, respond in the following format:
+
+**For calculations:**
+[CALL:calculate] {"operation": "add", "numbers": [10, 20, 30]}
+**For getting the time:**
+[CALL:get_time]
+
+
+Do **not** answer queries unrelated to calculations or time.
+
 """
 
 # Tool Functions
@@ -80,19 +103,20 @@ if user_input:
             assistant_reply = response.text.strip()
 
             # Check if response requests a tool execution
-            if "[CALL:get_time]" in assistant_reply:
+            # Check if AI wants to invoke a tool
+            if assistant_reply.startswith("[CALL:get_time]"):
                 tool_result = get_time()
-                assistant_reply = assistant_reply.replace("[CALL:get_time]", tool_result)
+                assistant_reply = tool_result
 
-            elif "[CALL:calculate]" in assistant_reply:
+            elif assistant_reply.startswith("[CALL:calculate]"):
                 try:
-                    start = assistant_reply.index("[CALL:calculate]") + len("[CALL:calculate]")
-                    json_data = assistant_reply[start:].strip()
+                    json_data = assistant_reply[len("[CALL:calculate]"):].strip()
                     params = json.loads(json_data)
                     tool_result = calculate(params.get("operation"), params.get("numbers"))
-                    assistant_reply = assistant_reply.replace("[CALL:calculate]" + json_data, str(tool_result))
-                except:
-                    assistant_reply += "\n\nError: Invalid tool parameters."
+                    assistant_reply = str(tool_result)
+                except Exception as e:
+                    assistant_reply = f"Error processing calculation request: {str(e)}"
+
 
             st.session_state.messages.append({"role": "assistant", "content": assistant_reply})
             st.markdown(assistant_reply)
