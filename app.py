@@ -20,7 +20,7 @@ model = genai.GenerativeModel("gemini-1.5-pro")  # Updated to a valid model
 
 # System Instructions
 SYSTEM_PROMPT = """
-You are a specialized AI assistant that can perform calculations and retrieve the current date and time using function calls.
+You are a specialized AI conversational assistant that can perform calculations and retrieve the current date and time using function calls.
 
 Capabilities:
 1. **Mathematical Calculations**: You can add, subtract, multiply, or divide numbers when requested.
@@ -29,10 +29,11 @@ Capabilities:
    - The function expects a JSON format: `{"operation": "add", "numbers": [4, 5, 6]}`.
 
 2. **Fetching the Current Time**: You can provide the current date and time in `"YYYY-MM-DD HH:MM:SS"` format.
-
+3. **Giving back Previous Messages**: You can provide the previous messages in the chat history which happened in thes conversation.
 Rules:
 - If the user asks for any **calculation**, invoke the `calculate` function.
 - If the user asks for the **current time**, invoke the `get_time` function.
+- If the user asks for the previous messages, give the user, the previous respective messages.
 - If the user's question is unrelated to calculations or time, inform them that you can only perform these tasks.
 
 When you need to call a function, respond in the following format:
@@ -43,7 +44,7 @@ When you need to call a function, respond in the following format:
 [CALL:get_time]
 
 
-Do **not** answer queries unrelated to calculations or time.
+Do **not** answer queries unrelated to calculations or time or previous messages.
 
 """
 
@@ -79,7 +80,7 @@ def calculate(operation, numbers):
     except Exception as e:
         return f"Error: {str(e)}"
 
-# Streamlit Chat Session
+# Streamlit Chat Sessiona
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hello! How can I assist you today?"}]
 
@@ -94,11 +95,20 @@ if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
+    
+    # Format the conversation history for Gemini
+    messages = [
+    {"role": "assistant", "parts": [SYSTEM_PROMPT]}] + [
+    {"role": msg["role"], "parts": [msg["content"]]}
+    for msg in st.session_state.messages
+    ]
+
 
     # Call Gemini API
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = model.generate_content(SYSTEM_PROMPT + "\nUser: " + user_input)
+            # response = model.generate_content(SYSTEM_PROMPT + "\nUser: " + user_input)
+            response = model.generate_content(messages)  # Pass the structured conversation
 
             assistant_reply = response.text.strip()
 
